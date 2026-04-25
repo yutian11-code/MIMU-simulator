@@ -4,6 +4,7 @@ stable-makeup/
 ComfyUI/
 .npm-cache/
 .worktrees/
+data/
 eval/makeup/runs/
 __pycache__/
 *.py[cod]
