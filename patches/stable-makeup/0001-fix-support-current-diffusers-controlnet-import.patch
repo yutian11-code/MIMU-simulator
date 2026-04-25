@@ -1,0 +1,38 @@
+From 8de15dd19a59fcb1d2efba8da2feef827e30d414 Mon Sep 17 00:00:00 2001
+From: Shushanfu <1198716953@qq.com>
+Date: Sat, 25 Apr 2026 16:50:00 +0800
+Subject: [PATCH] fix: support current diffusers controlnet import
+
+---
+ .gitignore       | 2 ++
+ pipeline_sd15.py | 4 ++--
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+ create mode 100644 .gitignore
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..43ae0e2
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,2 @@
++__pycache__/
++*.py[cod]
+diff --git a/pipeline_sd15.py b/pipeline_sd15.py
+index 5ea71bf..f135ea9 100644
+--- a/pipeline_sd15.py
++++ b/pipeline_sd15.py
+@@ -40,9 +40,9 @@ from diffusers.pipelines.pipeline_utils import DiffusionPipeline
+ from diffusers.pipelines.stable_diffusion.pipeline_output import StableDiffusionPipelineOutput
+ from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+ try:
+-    from diffusers.pipelines.controlnet.multicontrolnet import MultiControlNetModel
+-except :
+     from diffusers.models.controlnets.multicontrolnet import MultiControlNetModel
++except ImportError:
++    from diffusers.pipelines.controlnet.multicontrolnet import MultiControlNetModel
+ logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
+ 
+ 
+-- 
+2.34.1
+

@@ -56,7 +56,7 @@ curl -I http://127.0.0.1:19006
 ```bash
 cd /storage/nvme3/shushanfu/MIMU-colleague
 /home/shushanfu/software/Anaconda/envs/mimu-comfy/bin/python -m unittest discover -s eval/makeup/tests -v
-/home/shushanfu/software/Anaconda/envs/mimu-comfy/bin/python eval/makeup/run_eval_pipeline.py --manifest eval/makeup/manifests/regression_30.jsonl --output-dir eval/makeup/runs/regression_30 --backend-url http://127.0.0.1:13000
+/home/shushanfu/software/Anaconda/envs/mimu-comfy/bin/python eval/makeup/scripts/run_eval_pipeline.py --project-root /storage/nvme3/shushanfu/MIMU-colleague --output-root eval/makeup --backend-url http://127.0.0.1:13000 --case-count 90 --limit 90 --vlm-mode mock --run-id regression_90
 ```
 
 ## 人工验收路径
@@ -69,11 +69,32 @@ cd /storage/nvme3/shushanfu/MIMU-colleague
 6. 等待生成结果，确认页面能显示 `/makeup/result` 返回的图片。
 7. 如浏览器无法访问摄像头，优先改用相册上传；再检查浏览器站点权限、HTTPS/HTTP 策略和设备摄像头占用。
 
+## 可复现补丁
+
+Stable Makeup 的本地兼容补丁已导出到：
+
+```text
+patches/stable-makeup/0001-fix-support-current-diffusers-controlnet-import.patch
+```
+
+新机器重新拉取 `stable-makeup` 后，可按
+`patches/stable-makeup/README.md` 应用并验证。
+
+## 隐私与内测
+
+内测照片规则见 `docs/internal-test-and-privacy.md`。默认评测使用
+`--vlm-mode mock`，不会把图片发送到外部 VLM/LLM。真实人脸图片不要提交到
+git，也不要放进共享报告。
+
+清理本机测试图像和评测产物前先 dry-run：
+
+```bash
+bash scripts/cleanup-local-artifacts.sh --dry-run
+```
+
 ## 还未完成的产品化工作
 
-- 前端真实点击流需要在桌面 Web、手机浏览器、Expo Go 或原生包中各跑一次。
-- 妆容迁移目前是同步请求，后续需要任务队列、进度查询、并发限制和超时清理。
-- 当前评测集是 starter regression set，只能防回归，不能代表真实产品质量。
-- 需要扩展 80-120 个授权或 AI 生成的多样化评测 case，并建立人工抽检机制。
-- 用户人脸图片的存储周期、自动清理和隐私说明需要产品化前明确。
-- Stable Makeup 本地补丁需要转成可复现的 fork、patch 或安装脚本。
+- 还需要在真实手机浏览器、Expo Go 或原生包中各跑一次端侧验收。
+- 当前 90 case 仍是 starter regression set，只能防回归，不能代表真实产品质量。
+- 仍需要补充授权真实照片或 AI 生成肖像，建立人工抽检机制。
+- 单机内存队列适合当前内测；正式多机部署需要 Redis/数据库持久化队列。
