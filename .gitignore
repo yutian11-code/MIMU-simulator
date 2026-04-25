@@ -1,0 +1,8 @@
+backend/
+frontend/
+stable-makeup/
+ComfyUI/
+.npm-cache/
+
+*.log
+.DS_Store
