@@ -5,6 +5,8 @@ ComfyUI/
 .npm-cache/
 .worktrees/
 eval/makeup/runs/
+__pycache__/
+*.py[cod]
 
 *.log
 .DS_Store
