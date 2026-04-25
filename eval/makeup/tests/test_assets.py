@@ -26,18 +26,19 @@ class StarterAssetTests(unittest.TestCase):
             manifest_path = prepare_starter_dataset(
                 project_root=root,
                 output_root=output_root,
-                case_count=30,
+                case_count=90,
             )
 
-            self.assertEqual(manifest_path, output_root / "manifests/regression_30.jsonl")
+            self.assertEqual(manifest_path, output_root / "manifests/regression_90.jsonl")
             user_images = sorted((output_root / "assets/users").glob("*.jpg"))
             template_images = sorted((output_root / "assets/templates").glob("*.jpg"))
-            self.assertEqual(len(user_images), 10)
+            self.assertEqual(len(user_images), 30)
             self.assertEqual(len(template_images), 3)
 
             cases = load_cases(manifest_path, dataset_root=output_root)
-            self.assertEqual(len(cases), 30)
+            self.assertEqual(len(cases), 90)
             self.assertEqual(cases[0].id, "case_0001")
+            self.assertEqual(cases[-1].id, "case_0090")
             self.assertTrue(cases[0].user_path(output_root).exists())
             self.assertTrue(cases[0].template_path(output_root).exists())
             self.assertIn("source", cases[0].attributes)

@@ -11,7 +11,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Prepare starter MIMU makeup evaluation assets.")
     parser.add_argument("--project-root", type=Path, default=Path.cwd())
     parser.add_argument("--output-root", type=Path, default=Path("eval/makeup"))
-    parser.add_argument("--case-count", type=int, default=30)
+    parser.add_argument("--case-count", type=int, default=90)
     return parser.parse_args()
 
 

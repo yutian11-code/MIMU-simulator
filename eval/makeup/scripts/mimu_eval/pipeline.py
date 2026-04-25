@@ -21,11 +21,16 @@ def run_eval_pipeline(
     output_root: Path,
     backend_url: str,
     limit: int | None = None,
+    case_count: int = 90,
     vlm_mode: JudgeMode = "mock",
     run_id: str | None = None,
     client: CaseRunner | None = None,
 ) -> Path:
-    manifest = prepare_starter_dataset(project_root=project_root, output_root=output_root, case_count=30)
+    manifest = prepare_starter_dataset(
+        project_root=project_root,
+        output_root=output_root,
+        case_count=case_count,
+    )
     run_dir = make_run_dir(output_root / "runs", run_id=run_id)
     metadata_path = run_dir / "metadata.jsonl"
     if metadata_path.exists():

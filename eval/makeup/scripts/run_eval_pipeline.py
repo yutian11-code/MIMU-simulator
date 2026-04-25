@@ -12,6 +12,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--project-root", type=Path, default=Path.cwd())
     parser.add_argument("--output-root", type=Path, default=Path("eval/makeup"))
     parser.add_argument("--backend-url", default="http://127.0.0.1:13000")
+    parser.add_argument("--case-count", type=int, default=90)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--vlm-mode", choices=["skip", "mock"], default="mock")
     parser.add_argument("--run-id")
@@ -29,6 +30,7 @@ def main() -> None:
         output_root=output_root,
         backend_url=args.backend_url,
         limit=args.limit,
+        case_count=args.case_count,
         vlm_mode=args.vlm_mode,
         run_id=args.run_id,
     )

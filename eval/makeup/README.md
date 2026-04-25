@@ -29,7 +29,8 @@ The script prints the run directory. Open `report.html` in that directory to rev
 /home/shushanfu/software/Anaconda/envs/mimu-comfy/bin/python eval/makeup/scripts/run_eval_pipeline.py \
   --project-root /storage/nvme3/shushanfu/MIMU-colleague \
   --backend-url http://127.0.0.1:13000 \
-  --limit 30 \
+  --case-count 90 \
+  --limit 90 \
   --vlm-mode mock
 ```
 
@@ -37,14 +38,20 @@ Generated run outputs are written under `eval/makeup/runs/` and are ignored by g
 
 ## Data
 
-The first manifest is generated from `stable-makeup/example_.png` crop variants:
+The current starter manifest is generated from `stable-makeup/example_.png`
+crop variants:
 
 - `eval/makeup/assets/users/`
 - `eval/makeup/assets/templates/`
+- `eval/makeup/manifests/regression_90.jsonl`
 - `eval/makeup/manifests/regression_30.jsonl`
 - `eval/makeup/manifests/smoke_2.jsonl`
 
-This is a starter regression set for pipeline and model-route checks. Replace or extend it with AI-generated portraits or explicitly authorized real photos before using the scores as product-quality evidence.
+`regression_90.jsonl` contains 30 deterministic user variants crossed with 3
+template variants. `regression_30.jsonl` is kept as the earlier small baseline.
+Both are starter regression sets for pipeline and model-route checks. Replace or
+extend them with AI-generated portraits or explicitly authorized real photos
+before using the scores as product-quality evidence.
 
 ## VLM Mode
 
