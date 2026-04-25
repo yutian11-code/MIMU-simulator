@@ -129,12 +129,12 @@ def _identity_proxy_score(user: Image.Image, output: Image.Image) -> float:
 
 
 def _makeup_transfer_score(user: Image.Image, template: Image.Image, output: Image.Image) -> float:
-    baseline = _mean_region_distance(user, template, MAKEUP_REGIONS)
-    if baseline < 1:
+    target_change = _mean_region_distance(user, template, MAKEUP_REGIONS)
+    if target_change < 1:
         return 3
-    output_distance = _mean_region_distance(output, template, MAKEUP_REGIONS)
-    improvement = max(0, min(1, (baseline - output_distance) / baseline))
-    return _bounded(1 + 4 * improvement)
+    output_change = _mean_region_distance(user, output, MAKEUP_REGIONS)
+    transfer_ratio = max(0, min(1, output_change / max(1, target_change * 0.65)))
+    return _bounded(1 + 4 * transfer_ratio)
 
 
 def _naturalness_score(output: Image.Image) -> float:

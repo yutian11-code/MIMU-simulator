@@ -62,6 +62,29 @@ class ScoringTests(unittest.TestCase):
             self.assertGreaterEqual(transferred_score.scores["overall_score"], 3)
             self.assertEqual(transferred_score.failure_type, "none")
 
+    def test_makeup_region_delta_accepts_visible_change_even_when_not_template_exact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "run"
+            (run_dir / "outputs").mkdir(parents=True)
+            user = root / "u.jpg"
+            template = root / "t.jpg"
+            output = run_dir / "outputs/changed.png"
+            self._write_face(user, eye=(90, 90, 90), lip=(100, 100, 100))
+            self._write_face(template, eye=(240, 20, 20), lip=(20, 220, 20))
+            self._write_face(output, eye=(30, 130, 235), lip=(210, 70, 110))
+            case = EvalCase("case_0001", "u.jpg", "t.jpg", "style", {})
+
+            score = score_case(
+                case,
+                RunMetadata(case.id, "success", 1.0, output_image="outputs/changed.png"),
+                dataset_root=root,
+                run_dir=run_dir,
+            )
+
+            self.assertGreaterEqual(score.scores["makeup_transfer_score"], 3)
+            self.assertEqual(score.failure_type, "none")
+
     def _write_face(self, path: Path, eye: tuple[int, int, int], lip: tuple[int, int, int]) -> None:
         image = Image.new("RGB", (512, 512), (180, 160, 145))
         draw = ImageDraw.Draw(image)
