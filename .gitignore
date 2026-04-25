@@ -3,6 +3,7 @@ frontend/
 stable-makeup/
 ComfyUI/
 .npm-cache/
+.worktrees/
 
 *.log
 .DS_Store
