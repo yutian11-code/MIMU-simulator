@@ -4,6 +4,7 @@ stable-makeup/
 ComfyUI/
 .npm-cache/
 .worktrees/
+eval/makeup/runs/
 
 *.log
 .DS_Store
