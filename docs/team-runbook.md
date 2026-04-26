@@ -18,6 +18,7 @@
 - 前端 Expo Web：`http://10.246.1.70:19006`
 - HTTPS 路演入口：`https://10.246.1.70:19443`
 - ComfyUI：`http://10.246.1.70:8188`
+- 语音识别服务：`http://10.246.1.70:8020`
 
 其他机器访问前端时，确保前端 `.env.local` 指向后端局域网地址：
 
@@ -100,6 +101,8 @@ COACH_LLM_API_KEY=EMPTY
 COACH_LLM_BASE_URL=http://127.0.0.1:8010/v1
 COACH_LLM_MODEL=Qwen/Qwen2.5-VL-32B-Instruct-AWQ
 COACH_LLM_TIMEOUT_MS=120000
+COACH_ASR_BASE_URL=http://127.0.0.1:8020
+COACH_ASR_TIMEOUT_MS=120000
 ```
 
 后端接 DashScope：
@@ -115,6 +118,49 @@ COACH_LLM_MODEL=qwen-vl-plus-latest
 ```bash
 cd /storage/nvme3/shushanfu/MIMU-colleague
 bash scripts/download-qwen-vl-models.sh
+```
+
+### A 版语音指导
+
+A 版语音指导是“按住/点击录音 -> ASR 转写 -> 当前画面 + 转写文本进入 32B 视觉教练 -> 浏览器播报结果”的短轮次方案。它不是连续监听；连续视频通话和低延迟流式 ASR 留到 B 版。
+
+ASR 使用 `Qwen/Qwen3-ASR-0.6B`。Qwen 官方模型卡说明该系列支持离线和流式识别，`qwen-asr` 包可接收本地路径、URL、base64 或 numpy 音频输入；本项目 A 版服务将浏览器音频转为 WAV data URL，再在 Python 服务中写成临时 WAV 文件转写。
+
+创建语音环境和安装依赖：
+
+```bash
+conda create -n mimu-voice python=3.12 -y -c https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
+conda run -n mimu-voice pip install -r /storage/nvme3/shushanfu/MIMU-colleague/services/asr_service/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+下载 ASR 模型：
+
+```bash
+HF_ENDPOINT=https://hf-mirror.com python /storage/nvme3/shushanfu/checkpoint/down_load.py \
+  --repo-id Qwen/Qwen3-ASR-0.6B \
+  --save-path /storage/nvme3/shushanfu/checkpoint/huggingface/Qwen/Qwen3-ASR-0.6B
+```
+
+如果 hf-mirror 下载失败，再使用你允许的 7890 端口代理：
+
+```bash
+HF_ENDPOINT=https://hf-mirror.com HTTPS_PROXY=http://127.0.0.1:7890 HTTP_PROXY=http://127.0.0.1:7890 \
+python /storage/nvme3/shushanfu/checkpoint/down_load.py \
+  --repo-id Qwen/Qwen3-ASR-0.6B \
+  --save-path /storage/nvme3/shushanfu/checkpoint/huggingface/Qwen/Qwen3-ASR-0.6B
+```
+
+启动本地 ASR：
+
+```bash
+tmux new-session -d -s mimu_asr_8020 \
+  'CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=1 MIMU_ASR_DEVICE=cuda:0 MIMU_ASR_LANGUAGE=Chinese conda run -n mimu-voice python /storage/nvme3/shushanfu/MIMU-colleague/services/asr_service/server.py --host 0.0.0.0 --port 8020 2>&1 | tee /storage/nvme3/shushanfu/MIMU-colleague/var/logs/asr-8020.log'
+```
+
+检查：
+
+```bash
+curl -fsS http://127.0.0.1:8020/health
 ```
 
 摄像头权限排查：
