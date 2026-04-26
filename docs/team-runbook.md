@@ -103,8 +103,14 @@ cd /storage/nvme3/shushanfu/MIMU-colleague
 bash scripts/download-qwen-vl-models.sh
 ```
 
-摄像头注意事项：浏览器对局域网 HTTP 页面会限制 `getUserMedia`。本机可用
-`localhost` 打开；其他机器路演时建议用 HTTPS，或在 AI 视频指导页使用“上传画面”兜底。
+摄像头权限排查：
+
+- `http://10.246.1.70:19006` 这种局域网 HTTP 地址可以做普通页面演示和上传图片，但浏览器会禁用摄像头。
+- 在服务器本机浏览器打开 `http://localhost:19006` 可以申请摄像头权限。
+- 其他机器要使用摄像头，需要可信 HTTPS 域名，或在 Chrome 的
+  `chrome://flags/#unsafely-treat-insecure-origin-as-secure` 中临时加入
+  `http://10.246.1.70:19006`，重启浏览器后再测试。
+- 不改浏览器设置时，路演可以使用 `上传画面`，上传帧会进入同一个 32B VLM 指导链路。
 
 评测工具：
 
