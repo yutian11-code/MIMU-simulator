@@ -59,17 +59,7 @@ curl -I http://127.0.0.1:19006
 本地先用 32B AWQ 跑通：
 
 ```bash
-CUDA_VISIBLE_DEVICES=0,1,2,3 vllm serve /storage/nvme3/shushanfu/checkpoint/huggingface/Qwen/Qwen2.5-VL-32B-Instruct-AWQ \
-  --served-model-name Qwen/Qwen2.5-VL-32B-Instruct-AWQ \
-  --host 0.0.0.0 \
-  --port 8010 \
-  --tensor-parallel-size 4 \
-  --quantization awq \
-  --dtype half \
-  --max-model-len 4096 \
-  --max-num-seqs 1 \
-  --gpu-memory-utilization 0.85 \
-  --enforce-eager
+tmux new-session -d -s mimu_qwen_vl_32b 'bash /storage/nvme3/shushanfu/MIMU-colleague/scripts/start-qwen-vl-32b.sh 2>&1 | tee /storage/nvme3/shushanfu/MIMU-colleague/var/logs/qwen-vl-32b-vllm.log'
 ```
 
 32B 跑通后再试 72B AWQ：
@@ -94,6 +84,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 vllm serve /storage/nvme3/shushanfu/checkpoint/hugg
 COACH_LLM_API_KEY=EMPTY
 COACH_LLM_BASE_URL=http://127.0.0.1:8010/v1
 COACH_LLM_MODEL=Qwen/Qwen2.5-VL-32B-Instruct-AWQ
+COACH_LLM_TIMEOUT_MS=120000
 ```
 
 后端接 DashScope：
