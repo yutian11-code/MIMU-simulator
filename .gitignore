@@ -6,6 +6,7 @@
 .worktrees/
 data/
 eval/makeup/runs/
+var/certs/
 __pycache__/
 *.py[cod]
 

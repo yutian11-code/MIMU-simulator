@@ -16,6 +16,7 @@
 
 - 后端健康检查：`http://10.246.1.70:13000/health`
 - 前端 Expo Web：`http://10.246.1.70:19006`
+- HTTPS 路演入口：`https://10.246.1.70:19443`
 - ComfyUI：`http://10.246.1.70:8188`
 
 其他机器访问前端时，确保前端 `.env.local` 指向后端局域网地址：
@@ -49,7 +50,20 @@ cd /storage/nvme3/shushanfu/MIMU-colleague/frontend
 npx tsc --noEmit
 npm run lint
 curl -I http://127.0.0.1:19006
+curl -k -I https://127.0.0.1:19443
+curl -k https://127.0.0.1:19443/api/health
 ```
+
+HTTPS 局域网入口：
+
+```bash
+cd /storage/nvme3/shushanfu/MIMU-colleague
+tmux new-session -d -s mimu_https_gateway 'bash /storage/nvme3/shushanfu/MIMU-colleague/scripts/start-https-lan-gateway.sh 2>&1 | tee /storage/nvme3/shushanfu/MIMU-colleague/var/logs/https-lan-gateway.log'
+```
+
+这个网关监听 `0.0.0.0:19443`，页面请求转发到 `127.0.0.1:19006`，`/api/*`
+转发到 `127.0.0.1:13000`。前端在 HTTPS 访问时会自动使用同源 `/api`，避免浏览器
+mixed content 拦截。
 
 ## AI 视频指导
 
@@ -106,6 +120,9 @@ bash scripts/download-qwen-vl-models.sh
 摄像头权限排查：
 
 - `http://10.246.1.70:19006` 这种局域网 HTTP 地址可以做普通页面演示和上传图片，但浏览器会禁用摄像头。
+- 路演摄像头优先打开 `https://10.246.1.70:19443`。
+- 第一次打开会看到自签名证书警告，点击高级/继续访问；如果浏览器仍然不允许摄像头，需要把
+  `/storage/nvme3/shushanfu/MIMU-colleague/var/certs/mimu-lan.crt` 导入测试电脑的系统信任证书。
 - 在服务器本机浏览器打开 `http://localhost:19006` 可以申请摄像头权限。
 - 其他机器要使用摄像头，需要可信 HTTPS 域名，或在 Chrome 的
   `chrome://flags/#unsafely-treat-insecure-origin-as-secure` 中临时加入
