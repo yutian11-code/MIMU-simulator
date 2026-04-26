@@ -51,6 +51,69 @@ npm run lint
 curl -I http://127.0.0.1:19006
 ```
 
+## AI 视频指导
+
+执行页已经接入 `AI 视频指导`。前端会把当前步骤、用户问题和一帧摄像头画面发到后端
+`POST /makeup/coach`。没有模型 key 时，后端返回本地规则兜底指导，路演流程仍可跑通。
+
+本地先用 32B AWQ 跑通：
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 vllm serve /storage/nvme3/shushanfu/checkpoint/huggingface/Qwen/Qwen2.5-VL-32B-Instruct-AWQ \
+  --served-model-name Qwen/Qwen2.5-VL-32B-Instruct-AWQ \
+  --host 0.0.0.0 \
+  --port 8010 \
+  --tensor-parallel-size 4 \
+  --quantization awq \
+  --dtype half \
+  --max-model-len 4096 \
+  --max-num-seqs 1 \
+  --gpu-memory-utilization 0.85 \
+  --enforce-eager
+```
+
+32B 跑通后再试 72B AWQ：
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 vllm serve /storage/nvme3/shushanfu/checkpoint/huggingface/Qwen/Qwen2.5-VL-72B-Instruct-AWQ \
+  --served-model-name Qwen/Qwen2.5-VL-72B-Instruct-AWQ \
+  --host 0.0.0.0 \
+  --port 8010 \
+  --tensor-parallel-size 4 \
+  --quantization awq \
+  --dtype half \
+  --max-model-len 4096 \
+  --max-num-seqs 1 \
+  --gpu-memory-utilization 0.85 \
+  --enforce-eager
+```
+
+后端接本地 vLLM：
+
+```env
+COACH_LLM_API_KEY=EMPTY
+COACH_LLM_BASE_URL=http://127.0.0.1:8010/v1
+COACH_LLM_MODEL=Qwen/Qwen2.5-VL-32B-Instruct-AWQ
+```
+
+后端接 DashScope：
+
+```env
+COACH_LLM_API_KEY=<DashScope 百炼 Key>
+COACH_LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+COACH_LLM_MODEL=qwen-vl-plus-latest
+```
+
+模型下载：
+
+```bash
+cd /storage/nvme3/shushanfu/MIMU-colleague
+bash scripts/download-qwen-vl-models.sh
+```
+
+摄像头注意事项：浏览器对局域网 HTTP 页面会限制 `getUserMedia`。本机可用
+`localhost` 打开；其他机器路演时建议用 HTTPS，或在 AI 视频指导页使用“上传画面”兜底。
+
 评测工具：
 
 ```bash
