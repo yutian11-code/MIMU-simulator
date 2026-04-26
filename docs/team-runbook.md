@@ -56,7 +56,8 @@ curl -I http://127.0.0.1:19006
 执行页已经接入 `AI 视频指导`。前端会把当前步骤、用户问题和一帧摄像头画面发到后端
 `POST /makeup/coach`。没有模型 key 时，后端返回本地规则兜底指导，路演流程仍可跑通。
 
-本地先用 32B AWQ 跑通：
+本地先用 32B AWQ 跑通。启动脚本默认使用 4 张 4090（GPU 3,4,5,6）和
+`tensor-parallel-size=4`：
 
 ```bash
 tmux new-session -d -s mimu_qwen_vl_32b 'bash /storage/nvme3/shushanfu/MIMU-colleague/scripts/start-qwen-vl-32b.sh 2>&1 | tee /storage/nvme3/shushanfu/MIMU-colleague/var/logs/qwen-vl-32b-vllm.log'
@@ -65,7 +66,7 @@ tmux new-session -d -s mimu_qwen_vl_32b 'bash /storage/nvme3/shushanfu/MIMU-coll
 32B 跑通后再试 72B AWQ：
 
 ```bash
-CUDA_VISIBLE_DEVICES=0,1,2,3 vllm serve /storage/nvme3/shushanfu/checkpoint/huggingface/Qwen/Qwen2.5-VL-72B-Instruct-AWQ \
+CUDA_VISIBLE_DEVICES=3,4,5,6 vllm serve /storage/nvme3/shushanfu/checkpoint/huggingface/Qwen/Qwen2.5-VL-72B-Instruct-AWQ \
   --served-model-name Qwen/Qwen2.5-VL-72B-Instruct-AWQ \
   --host 0.0.0.0 \
   --port 8010 \
