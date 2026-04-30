@@ -5,10 +5,18 @@
 .npm-cache/
 .worktrees/
 data/
+var/
 eval/makeup/runs/
 var/certs/
 __pycache__/
 *.py[cod]
 
 *.log
+*.mp4
+*.zip
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
 .DS_Store
