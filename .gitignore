@@ -20,3 +20,4 @@ __pycache__/
 *.pth
 *.bin
 .DS_Store
+.idea/
