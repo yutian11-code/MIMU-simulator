@@ -21,3 +21,6 @@ __pycache__/
 *.bin
 .DS_Store
 .idea/
+simulator-*.png
+simulator-*.xml
+.expo
