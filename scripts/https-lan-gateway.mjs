@@ -9,7 +9,7 @@ const listenPort = Number(process.env.MIMU_HTTPS_PORT || 19443);
 const certPath = process.env.MIMU_HTTPS_CERT || '/storage/nvme3/shushanfu/MIMU-colleague/var/certs/mimu-lan.crt';
 const keyPath = process.env.MIMU_HTTPS_KEY || '/storage/nvme3/shushanfu/MIMU-colleague/var/certs/mimu-lan.key';
 const frontendOrigin = new URL(process.env.MIMU_FRONTEND_ORIGIN || 'http://127.0.0.1:19006');
-const backendOrigin = new URL(process.env.MIMU_BACKEND_ORIGIN || 'http://127.0.0.1:13000');
+const backendOrigin = new URL(process.env.MIMU_BACKEND_ORIGIN || 'http://10.246.1.70:13001');
 
 function stripApiPrefix(url) {
   const parsed = new URL(url || '/', 'https://mimu.local');
