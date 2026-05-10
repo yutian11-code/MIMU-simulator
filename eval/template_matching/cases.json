@@ -1,0 +1,68 @@
+[
+  {
+    "id": "daily_clear_commute",
+    "rawUserInput": "明天上班想画清透白开水通勤妆，十分钟内完成",
+    "expectedTemplateId": "std_daily_clear_commute",
+    "expectedFamily": "DAILY_COMMUTE"
+  },
+  {
+    "id": "sweet_date",
+    "rawUserInput": "周末约会想画韩系水光甜妹初恋妆",
+    "expectedTemplateId": "std_korean_japanese_girl",
+    "expectedFamily": "KOREAN_JAPANESE_GIRL"
+  },
+  {
+    "id": "elegant_interview",
+    "rawUserInput": "面试需要轻熟知性优雅妆，不要太浓",
+    "expectedTemplateId": "std_elegant_luxury",
+    "expectedFamily": "ELEGANT_LUXURY"
+  },
+  {
+    "id": "asian_mixed_thai_date",
+    "rawUserInput": "约会想要泰式混血感修容妆，轮廓清晰一点",
+    "expectedTemplateId": "std_asian_mixed",
+    "expectedFamily": "ASIAN_MIXED"
+  },
+  {
+    "id": "chinese_retro_red_lip",
+    "rawUserInput": "想要新中式复古港风红唇妆",
+    "expectedTemplateId": "std_chinese_style",
+    "expectedFamily": "CHINESE_STYLE"
+  },
+  {
+    "id": "western_camera",
+    "rawUserInput": "拍照想要轻欧美截断眼妆和哑光底妆",
+    "expectedTemplateId": "std_western",
+    "expectedFamily": "WESTERN"
+  },
+  {
+    "id": "western_smoky_night",
+    "rawUserInput": "晚上聚会想画欧美烟熏妆，修容明显一点",
+    "expectedTemplateId": "std_western",
+    "expectedFamily": "WESTERN"
+  },
+  {
+    "id": "stage_punk_halloween",
+    "rawUserInput": "万圣节想画朋克舞台妆，需要浓一点有冲击力",
+    "expectedTemplateId": "std_stage_creative",
+    "expectedFamily": "STAGE_CREATIVE"
+  },
+  {
+    "id": "specific_y2k",
+    "rawUserInput": "今晚想试 Y2K 辣妹女团上镜妆",
+    "expectedTemplateId": "std_specific_y2k_spicy",
+    "expectedFamily": "SPECIFIC_VISUAL"
+  },
+  {
+    "id": "specific_idol_camera",
+    "rawUserInput": "拍短视频想要女团上镜妆，眼妆亮一点",
+    "expectedTemplateId": "std_specific_y2k_spicy",
+    "expectedFamily": "SPECIFIC_VISUAL"
+  },
+  {
+    "id": "daily_fast_school",
+    "rawUserInput": "早八上课想画伪素颜白开水妆，越快越好",
+    "expectedTemplateId": "std_daily_clear_commute",
+    "expectedFamily": "DAILY_COMMUTE"
+  }
+]
