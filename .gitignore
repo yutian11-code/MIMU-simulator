@@ -4,6 +4,7 @@
 /ComfyUI/
 .npm-cache/
 .worktrees/
+.superpowers/
 data/
 var/
 eval/makeup/runs/
@@ -21,3 +22,16 @@ __pycache__/
 *.bin
 .DS_Store
 .idea/
+
+# Local UI debugging artifacts.
+/current-screen.png
+/emulator-current.png
+/mimu-*.png
+/simulator-*.png
+/simulator-*.xml
+/window*.xml
+/*.aac
+/*.flac
+/*.m4a
+/*.mp3
+/*.wav
