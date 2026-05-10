@@ -31,7 +31,18 @@
 
 ## 2. 前端现在多了什么能力
 
-前端没有新增一个独立入口，而是把正式模板库和匹配算法结果接进现有“生成推荐 -> 产品清单 -> 执行步骤”链路。
+前端现在有两条入口：
+
+- 模板库管理：`个人档案 -> 模板库管理`，可导入标准模板、查看列表、编辑草稿、发布和回滚。
+- 用户推荐链路：`生成今日妆容 -> 推荐结果 -> 产品清单 -> 执行步骤`，推荐算法读取数据库中已发布的模板版本。
+
+模板库管理页现在会显示：
+
+- 模板状态：草稿、已发布、已归档。
+- 当前版本号、风格族、预计分钟数。
+- seed 按钮：将产品文档中的 8 类标准模板写入数据库。
+- 详情页：编辑模板名称、描述、场景、风格、模板说明、视觉说明和变更说明。
+- 版本页：查看版本历史，并将历史版本复制成新的已发布版本完成回滚。
 
 推荐结果页现在会显示：
 
@@ -59,7 +70,43 @@
 
 这一节按“我是一个真实用户”的方式测试。现在的验证重点已经从“接口旁证”变成“前端页面直接可见”：用户输入需求后，应能在推荐结果页看到命中模板证据，在产品清单页看到槽位匹配状态，在执行页看到本步完成标准。
 
-### 主旅程：生成一套面试轻熟知性妆
+### 管理旅程：初始化、编辑、发布、回滚模板
+
+**用户角色**
+
+我是模板运营或算法联调同学，需要确认产品文档中的标准模板已经进入数据库，并且前端能完成模板管理。
+
+**前端操作**
+
+1. 打开前端并登录 demo 账号。
+2. 进入 `个人档案`。
+3. 点击 `模板库管理`。
+4. 如果列表为空，点击右上角云上传图标导入标准模板。
+5. 列表应出现 8 个标准模板，包含通勤、韩日甜妹、轻熟千金、亚裔混血、国风、欧美、舞台创意、特定视觉。
+6. 点击任意模板进入详情页。
+7. 修改“变更说明”或模板描述，点击 `保存草稿`。
+8. 详情页状态应变为 `draft`，当前版本号增加。
+9. 点击 `发布当前草稿`。
+10. 状态应变为 `published`，该版本成为当前版本。
+11. 点击右上角时钟图标进入版本历史。
+12. 对非当前发布版本点击 `回滚到此版本`。
+13. 系统应生成一个新的已发布版本，历史版本不被覆盖。
+
+**后端旁证**
+
+```bash
+curl -fsS \
+  -H 'Authorization: Bearer demo-token' \
+  http://127.0.0.1:13001/makeup-template-library/templates | python -m json.tool
+```
+
+预期：
+
+- `items.length` 至少为 8。
+- 每个已发布模板都有 `currentVersion`。
+- `currentVersion.stepBlocks` 和 `currentVersion.productSlots` 非空。
+
+### 用户旅程：生成一套面试轻熟知性妆
 
 **用户动机**
 
@@ -161,6 +208,7 @@ curl -fsS \
 ```json
 {
   "selectedTemplateId": "std_elegant_luxury",
+  "selectedTemplateVersionId": "std_elegant_luxury_v1",
   "selectedFamily": "ELEGANT_LUXURY"
 }
 ```
@@ -271,6 +319,7 @@ curl -fsS \
 ```json
 {
   "selectedTemplateId": "std_elegant_luxury",
+  "selectedTemplateVersionId": "std_elegant_luxury_v1",
   "selectedFamily": "ELEGANT_LUXURY"
 }
 ```
@@ -403,6 +452,7 @@ curl -fsS \
 
 - `generatedTemplateId`：说明推荐结果来自新生成模板。
 - `sourceStandardTemplateId`：命中的标准模板。
+- `sourceStandardTemplateVersionId`：命中的标准模板版本。
 - `templateFamily`：命中的模板族。
 - `matchScore`：匹配分。
 - `productCoverageRate`：产品覆盖率。
@@ -439,9 +489,12 @@ curl -fsS \
 
 ## 11. 常见问题
 
-### 11.1 为什么前端没有新增独立入口？
+### 11.1 前端入口在哪里？
 
-这次能力接在现有推荐链路里。测试入口仍然是“生成今日妆容”，生成后在推荐结果页、产品清单页和普通执行页查看新增字段。
+现在有两个入口：
+
+- 模板库平台入口：`个人档案 -> 模板库管理`。
+- 用户推荐验证入口：`生成今日妆容`，生成后在推荐结果页、产品清单页和普通执行页查看新增字段。
 
 ### 11.2 如何证明不是旧逻辑？
 
@@ -468,6 +521,7 @@ POST http://10.246.1.70:13001/recommendations/generate
 
 - `generatedTemplateId`
 - `sourceStandardTemplateId`
+- `sourceStandardTemplateVersionId`
 - `templateFamily`
 - `matchScore`
 - `productCoverageRate`

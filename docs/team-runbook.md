@@ -74,10 +74,80 @@ tmux new-session -d -s mimu_https_gateway \
 
 ## MMU 模板库智能匹配
 
-模板匹配链路默认不独占 GPU。在线优先使用标准模板库，
-先走缓存、索引和规则匹配。只有配置了
+模板匹配链路默认不独占 GPU。在线优先读取 PostgreSQL 中
+`published` 的标准模板当前版本；数据库未 seed 时会回退到本地静态模板，
+保证开发环境可用。只有配置了
 `TEMPLATE_EMBEDDING_BASE_URL` 或 `TEMPLATE_RERANKER_BASE_URL` 时，
 才会调用可选的 embedding / reranker 模型服务。
+
+### 模板库初始化与管理
+
+首次部署或数据库迁移后，先执行迁移：
+
+```bash
+cd /storage/nvme3/shushanfu/MIMU-colleague/backend
+npx prisma migrate deploy
+```
+
+然后 seed 产品文档中的标准模板库：
+
+```bash
+curl -fsS -X POST http://127.0.0.1:13001/makeup-template-library/seed \
+  -H 'Authorization: Bearer demo-token' \
+  -H 'Content-Type: application/json' \
+  -d '{}' | python -m json.tool
+```
+
+预期返回 8 个 style/template 计数，以及产品分类、操作区域、脸型和难度规则计数。
+
+管理 API：
+
+```text
+GET  /makeup-template-library/taxonomy
+GET  /makeup-template-library/templates
+GET  /makeup-template-library/templates/:templateId
+GET  /makeup-template-library/templates/:templateId/versions
+GET  /makeup-template-library/templates/:templateId/versions/:versionId
+POST /makeup-template-library/templates
+PUT  /makeup-template-library/templates/:templateId/draft
+POST /makeup-template-library/templates/:templateId/publish
+POST /makeup-template-library/templates/:templateId/archive
+POST /makeup-template-library/templates/:templateId/rollback
+POST /makeup-template-library/seed
+```
+
+前端入口：
+
+```text
+个人档案 -> 模板库管理
+```
+
+前端可完成：
+
+- 导入标准模板。
+- 按状态搜索模板。
+- 编辑当前版本生成草稿。
+- 发布草稿为当前正式版本。
+- 查看版本历史并回滚，回滚会复制历史版本生成新的已发布版本。
+
+推荐链路验证：
+
+```bash
+curl -fsS -X POST http://127.0.0.1:13001/recommendations/generate \
+  -H 'Authorization: Bearer demo-token' \
+  -H 'Content-Type: application/json' \
+  -d '{"userId":"user-001","scenario":"面试","scenarioDetails":"面试需要轻熟知性优雅妆，不要太浓","requirements":["不要太浓"]}' \
+  | python -m json.tool
+```
+
+响应应包含：
+
+- `generatedTemplateId`
+- `sourceStandardTemplateId`
+- `sourceStandardTemplateVersionId`
+- `templateFamily`
+- `matchScore`
+- `steps[].productSlots`
 
 资源预算：
 
