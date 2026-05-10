@@ -1,29 +1,33 @@
 # MIMU Colleague Team Runbook
 
-本文档记录当前同事版项目的本地运行、联调验证和后续交付缺口。旧版
-`/storage/nvme3/shushanfu/MIMU` 只作为技术备份；当前有效工作目录是
+本文档记录当前项目的本地运行、联调验证和交付缺口。
+旧版 `/storage/nvme3/shushanfu/MIMU` 只作为技术备份；
+当前有效工作目录是
 `/storage/nvme3/shushanfu/MIMU-colleague`。
 
 ## 仓库与分支
 
-- 后端：`backend`，基线 `origin/master`，开发分支 `feature-ssf`
-- 前端：`frontend`，基线 `origin/dev`，开发分支 `feature-ssf`
+- 后端：`backend`，基线 `origin/master`，当前开发分支
+  `feature-makeup-template-generation`
+- 前端：`frontend`，基线 `origin/dev`，当前开发分支
+  `feature-makeup-template-generation`
 - 妆容迁移节点：`stable-makeup`，包含本地 diffusers 兼容补丁
 - ComfyUI：`ComfyUI`，作为本机推理服务使用
 - 评测工具：`eval/makeup`，位于当前顶层元仓库
 
 ## 当前联调地址
 
-- 后端健康检查：`http://10.246.1.70:13000/health`
+- 后端健康检查：`http://10.246.1.70:13001/health`
 - 前端 Expo Web：`http://10.246.1.70:19006`
 - HTTPS 路演入口：`https://10.246.1.70:19443`
 - ComfyUI：`http://10.246.1.70:8188`
 - 语音识别服务：`http://10.246.1.70:8020`
 
-其他机器访问前端时，确保前端 `.env.local` 指向后端局域网地址：
+其他机器访问前端时，确保前端 `.env.local`
+指向后端局域网地址：
 
 ```env
-EXPO_PUBLIC_API_BASE_URL=http://10.246.1.70:13000
+EXPO_PUBLIC_API_BASE_URL=http://10.246.1.70:13001
 ```
 
 后端 `.env` 中 ComfyUI 地址默认是本机：
@@ -41,7 +45,7 @@ cd /storage/nvme3/shushanfu/MIMU-colleague/backend
 npm run build
 npm run test
 npm run test:e2e
-curl -fsS http://127.0.0.1:13000/health
+curl -fsS http://127.0.0.1:13001/health
 ```
 
 前端：
@@ -59,29 +63,70 @@ HTTPS 局域网入口：
 
 ```bash
 cd /storage/nvme3/shushanfu/MIMU-colleague
-tmux new-session -d -s mimu_https_gateway 'bash /storage/nvme3/shushanfu/MIMU-colleague/scripts/start-https-lan-gateway.sh 2>&1 | tee /storage/nvme3/shushanfu/MIMU-colleague/var/logs/https-lan-gateway.log'
+tmux new-session -d -s mimu_https_gateway \
+  'bash -lc "bash scripts/start-https-lan-gateway.sh 2>&1 |
+  tee var/logs/https-lan-gateway.log"'
 ```
 
-这个网关监听 `0.0.0.0:19443`，页面请求转发到 `127.0.0.1:19006`，`/api/*`
-转发到 `127.0.0.1:13000`。前端在 HTTPS 访问时会自动使用同源 `/api`，避免浏览器
-mixed content 拦截。
+这个网关监听 `0.0.0.0:19443`，页面请求转发到 `127.0.0.1:19006`，
+`/api/*` 转发到 `127.0.0.1:13001`。前端在 HTTPS 访问时会自动使用
+同源 `/api`，避免浏览器 mixed content 拦截。
+
+## MMU 模板库智能匹配
+
+模板匹配链路默认不独占 GPU。在线优先使用标准模板库，
+先走缓存、索引和规则匹配。只有配置了
+`TEMPLATE_EMBEDDING_BASE_URL` 或 `TEMPLATE_RERANKER_BASE_URL` 时，
+才会调用可选的 embedding / reranker 模型服务。
+
+资源预算：
+
+- GPU 0-3：3090，可承载轻量 embedding、reranker 或离线批处理。
+- GPU 4-7：48G 4090，保留给 VLM、妆容预览和实时教练。
+- 该路径不新增常驻 72B 服务。
+
+后端可选环境变量：
+
+```env
+TEMPLATE_EMBEDDING_BASE_URL=
+TEMPLATE_EMBEDDING_MODEL=
+TEMPLATE_RERANKER_BASE_URL=
+TEMPLATE_RERANKER_MODEL=
+TEMPLATE_MODEL_TIMEOUT_MS=30000
+```
+
+模型下载优先使用 hf-mirror：
+
+```bash
+HF_ENDPOINT=https://hf-mirror.com \
+python /storage/nvme3/shushanfu/checkpoint/down_load.py ...
+```
+
+如果镜像下载失败，再按需加 7890 端口代理。
 
 ## AI 视频指导
 
-执行页已经接入 `AI 视频指导`。前端会把当前步骤、用户问题和一帧摄像头画面发到后端
-`POST /makeup/coach`。没有模型 key 时，后端返回本地规则兜底指导，路演流程仍可跑通。
+执行页已接入 `AI 视频指导`。前端会把步骤、问题和一帧
+摄像头画面发到后端 `POST /makeup/coach`。没有模型 key 时，
+后端返回
+本地规则兜底指导，路演流程仍可跑通。
 
-本地先用 32B AWQ 跑通。启动脚本默认使用 4 张 4090（GPU 3,4,5,6）和
+本地先用 32B AWQ 跑通。启动脚本默认使用 4 张 4090
+（GPU 3,4,5,6）和
 `tensor-parallel-size=4`：
 
 ```bash
-tmux new-session -d -s mimu_qwen_vl_32b 'bash /storage/nvme3/shushanfu/MIMU-colleague/scripts/start-qwen-vl-32b.sh 2>&1 | tee /storage/nvme3/shushanfu/MIMU-colleague/var/logs/qwen-vl-32b-vllm.log'
+tmux new-session -d -s mimu_qwen_vl_32b \
+  'bash -lc "bash scripts/start-qwen-vl-32b.sh 2>&1 |
+  tee var/logs/qwen-vl-32b-vllm.log"'
 ```
 
 32B 跑通后再试 72B AWQ：
 
 ```bash
-CUDA_VISIBLE_DEVICES=3,4,5,6 vllm serve /storage/nvme3/shushanfu/checkpoint/huggingface/Qwen/Qwen2.5-VL-72B-Instruct-AWQ \
+MODEL_DIR=/storage/nvme3/shushanfu/checkpoint/huggingface/Qwen
+CUDA_VISIBLE_DEVICES=3,4,5,6 vllm serve \
+  "$MODEL_DIR/Qwen2.5-VL-72B-Instruct-AWQ" \
   --served-model-name Qwen/Qwen2.5-VL-72B-Instruct-AWQ \
   --host 0.0.0.0 \
   --port 8010 \
@@ -122,39 +167,56 @@ bash scripts/download-qwen-vl-models.sh
 
 ### A 版语音指导
 
-A 版语音指导是“按住/点击录音 -> ASR 转写 -> 当前画面 + 转写文本进入 32B 视觉教练 -> 浏览器播报结果”的短轮次方案。它不是连续监听；连续视频通话和低延迟流式 ASR 留到 B 版。
+A 版语音指导是“录音 -> ASR 转写 -> 当前画面 + 文本进入
+32B 视觉教练 -> 浏览器播报结果”的短轮次方案。
+它不是连续监听；
+连续视频通话和低延迟流式 ASR 留到 B 版。
 
-ASR 使用 `Qwen/Qwen3-ASR-0.6B`。Qwen 官方模型卡说明该系列支持离线和流式识别，`qwen-asr` 包可接收本地路径、URL、base64 或 numpy 音频输入；本项目 A 版服务将浏览器音频转为 WAV data URL，再在 Python 服务中写成临时 WAV 文件转写。
+ASR 使用 `Qwen/Qwen3-ASR-0.6B`。Qwen 官方模型卡说明该系列支持
+离线和流式识别，`qwen-asr` 包可接收本地路径、URL、base64 或
+numpy 音频输入。本项目 A 版把浏览器音频转为 WAV data URL，
+再在 Python 服务中写成临时 WAV 文件转写。
 
 创建语音环境和安装依赖：
 
 ```bash
-conda create -n mimu-voice python=3.12 -y -c https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
-conda run -n mimu-voice pip install -r /storage/nvme3/shushanfu/MIMU-colleague/services/asr_service/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+conda create -n mimu-voice python=3.12 -y \
+  -c https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
+conda run -n mimu-voice pip install \
+  -r services/asr_service/requirements.txt \
+  -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 下载 ASR 模型：
 
 ```bash
-HF_ENDPOINT=https://hf-mirror.com python /storage/nvme3/shushanfu/checkpoint/down_load.py \
+MODEL_DIR=/storage/nvme3/shushanfu/checkpoint/huggingface/Qwen
+HF_ENDPOINT=https://hf-mirror.com \
+python /storage/nvme3/shushanfu/checkpoint/down_load.py \
   --repo-id Qwen/Qwen3-ASR-0.6B \
-  --save-path /storage/nvme3/shushanfu/checkpoint/huggingface/Qwen/Qwen3-ASR-0.6B
+  --save-path "$MODEL_DIR/Qwen3-ASR-0.6B"
 ```
 
 如果 hf-mirror 下载失败，再使用你允许的 7890 端口代理：
 
 ```bash
-HF_ENDPOINT=https://hf-mirror.com HTTPS_PROXY=http://127.0.0.1:7890 HTTP_PROXY=http://127.0.0.1:7890 \
+MODEL_DIR=/storage/nvme3/shushanfu/checkpoint/huggingface/Qwen
+HF_ENDPOINT=https://hf-mirror.com \
+HTTPS_PROXY=http://127.0.0.1:7890 \
+HTTP_PROXY=http://127.0.0.1:7890 \
 python /storage/nvme3/shushanfu/checkpoint/down_load.py \
   --repo-id Qwen/Qwen3-ASR-0.6B \
-  --save-path /storage/nvme3/shushanfu/checkpoint/huggingface/Qwen/Qwen3-ASR-0.6B
+  --save-path "$MODEL_DIR/Qwen3-ASR-0.6B"
 ```
 
 启动本地 ASR：
 
 ```bash
 tmux new-session -d -s mimu_asr_8020 \
-  'CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=1 MIMU_ASR_DEVICE=cuda:0 MIMU_ASR_LANGUAGE=Chinese conda run -n mimu-voice python /storage/nvme3/shushanfu/MIMU-colleague/services/asr_service/server.py --host 0.0.0.0 --port 8020 2>&1 | tee /storage/nvme3/shushanfu/MIMU-colleague/var/logs/asr-8020.log'
+  'CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=1 MIMU_ASR_DEVICE=cuda:0 \
+  MIMU_ASR_LANGUAGE=Chinese conda run -n mimu-voice python \
+  services/asr_service/server.py --host 0.0.0.0 --port 8020 \
+  2>&1 | tee var/logs/asr-8020.log'
 ```
 
 检查：
@@ -165,22 +227,39 @@ curl -fsS http://127.0.0.1:8020/health
 
 摄像头权限排查：
 
-- `http://10.246.1.70:19006` 这种局域网 HTTP 地址可以做普通页面演示和上传图片，但浏览器会禁用摄像头。
+- `http://10.246.1.70:19006` 这种局域网 HTTP 可做页面演示和
+  上传图片，但浏览器会禁用摄像头。
 - 路演摄像头优先打开 `https://10.246.1.70:19443`。
-- 第一次打开会看到自签名证书警告，点击高级/继续访问；如果浏览器仍然不允许摄像头，需要把
-  `/storage/nvme3/shushanfu/MIMU-colleague/var/certs/mimu-lan.crt` 导入测试电脑的系统信任证书。
-- 在服务器本机浏览器打开 `http://localhost:19006` 可以申请摄像头权限。
+- 首次打开会看到自签名证书警告，点击高级/继续；
+  如果浏览器
+  仍然
+  不允许摄像头，需要把
+  `/storage/nvme3/shushanfu/MIMU-colleague/var/certs/mimu-lan.crt`
+  导入测试电脑的系统信任证书。
+- 在服务器本机浏览器打开 `http://localhost:19006`
+  可以申请摄像头权限。
 - 其他机器要使用摄像头，需要可信 HTTPS 域名，或在 Chrome 的
   `chrome://flags/#unsafely-treat-insecure-origin-as-secure` 中临时加入
   `http://10.246.1.70:19006`，重启浏览器后再测试。
-- 不改浏览器设置时，路演可以使用 `上传画面`，上传帧会进入同一个 32B VLM 指导链路。
+- 不改浏览器设置时，路演可用 `上传画面`，
+  上传帧会进入同一个
+  32B VLM 指导链路。
 
 评测工具：
 
 ```bash
 cd /storage/nvme3/shushanfu/MIMU-colleague
-/home/shushanfu/software/Anaconda/envs/mimu-comfy/bin/python -m unittest discover -s eval/makeup/tests -v
-/home/shushanfu/software/Anaconda/envs/mimu-comfy/bin/python eval/makeup/scripts/run_eval_pipeline.py --project-root /storage/nvme3/shushanfu/MIMU-colleague --output-root eval/makeup --backend-url http://127.0.0.1:13000 --case-count 90 --limit 90 --vlm-mode mock --run-id regression_90
+/home/shushanfu/software/Anaconda/envs/mimu-comfy/bin/python \
+  -m unittest discover -s eval/makeup/tests -v
+/home/shushanfu/software/Anaconda/envs/mimu-comfy/bin/python \
+  eval/makeup/scripts/run_eval_pipeline.py \
+  --project-root /storage/nvme3/shushanfu/MIMU-colleague \
+  --output-root eval/makeup \
+  --backend-url http://127.0.0.1:13001 \
+  --case-count 90 \
+  --limit 90 \
+  --vlm-mode mock \
+  --run-id regression_90
 ```
 
 ## 人工验收路径
@@ -189,9 +268,11 @@ cd /storage/nvme3/shushanfu/MIMU-colleague
 2. 使用测试账号登录：`demo@beautyasset.app` / `demo123456`。
 3. 进入推荐页，选择一个彩妆模板。
 4. 查看模板图片和视频是否正常显示。
-5. 进入方案结果页，使用“妆容预览”上传或拍摄一张正脸图。
-6. 等待生成结果，确认页面能显示 `/makeup/result` 返回的图片。
-7. 如浏览器无法访问摄像头，优先改用相册上传；再检查浏览器站点权限、HTTPS/HTTP 策略和设备摄像头占用。
+5. 进入方案结果页，使用“妆容预览”上传或拍摄正脸图。
+6. 等待结果，确认页面能显示 `/makeup/result` 返回的图片。
+7. 如浏览器无法访问摄像头，优先改用相册上传；再检查
+   站点权限、
+   HTTPS/HTTP 策略和设备摄像头占用。
 
 ## 可复现补丁
 
@@ -207,7 +288,8 @@ patches/stable-makeup/0001-fix-support-current-diffusers-controlnet-import.patch
 ## 隐私与内测
 
 内测照片规则见 `docs/internal-test-and-privacy.md`。默认评测使用
-`--vlm-mode mock`，不会把图片发送到外部 VLM/LLM。真实人脸图片不要提交到
+`--vlm-mode mock`，不会把图片发送到外部 VLM/LLM。
+真实人脸图片不要提交到
 git，也不要放进共享报告。
 
 清理本机测试图像和评测产物前先 dry-run：
@@ -218,7 +300,9 @@ bash scripts/cleanup-local-artifacts.sh --dry-run
 
 ## 还未完成的产品化工作
 
-- 还需要在真实手机浏览器、Expo Go 或原生包中各跑一次端侧验收。
-- 当前 90 case 仍是 starter regression set，只能防回归，不能代表真实产品质量。
-- 仍需要补充授权真实照片或 AI 生成肖像，建立人工抽检机制。
-- 单机内存队列适合当前内测；正式多机部署需要 Redis/数据库持久化队列。
+- 还需要在真实手机浏览器、Expo Go 或原生包中做端侧验收。
+- 当前 90 case 仍是 starter regression set，只能防回归，
+  不能代表真实产品质量。
+- 仍需要补充授权真实照片或 AI 生成肖像，建立抽检机制。
+- 单机内存队列适合当前内测；正式多机部署需要 Redis
+  或数据库持久化队列。
