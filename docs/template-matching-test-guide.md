@@ -23,7 +23,7 @@
    - `STAGE_CREATIVE` 舞台创意
    - `SPECIFIC_VISUAL` 特定视觉，如 Y2K、女团、辣妹
 
-3. 匹配算法：综合模板描述相似度、风格标签、场景、已有产品覆盖率、用户难度适配、缺失产品惩罚。配置 embedding/reranker 服务时会用模型分数；未配置时自动降级为本地可解释打分。
+3. 匹配算法：综合 embedding 召回、reranker 重排、模板描述相似度、风格标签、场景、参考图特征、已有产品覆盖率、用户难度适配、历史偏好、缺失产品惩罚。embedding/reranker 是正式链路必需服务；未配置或异常时会明确失败，不再静默规则降级。
 
 4. 生成个性化妆容模板：匹配到标准模板后，会按用户已有产品做产品槽位匹配，生成分步执行模板、缺失产品、替代品、完成条件和失败反馈。
 
@@ -48,6 +48,8 @@
 
 - 命中模板族，例如 `轻熟千金`、`国风新中式`、`欧美系`。
 - 标准模板 ID，例如 `std_elegant_luxury`。
+- 模型证据：`templateTraceId`、embedding/rerank/VLM 状态、语义分、重排分、难度分。
+- 5 步执行块对应的 MMU 标准步骤码，例如 `SKIN_PREP / FOUNDATION`。
 - 产品覆盖率和匹配强度。
 - 缺失产品类型。
 - 个性化推荐理由。
@@ -84,13 +86,23 @@
 4. 如果列表为空，点击右上角云上传图标导入标准模板。
 5. 列表应出现 8 个标准模板，包含通勤、韩日甜妹、轻熟千金、亚裔混血、国风、欧美、舞台创意、特定视觉。
 6. 点击任意模板进入详情页。
-7. 修改“变更说明”或模板描述，点击 `保存草稿`。
-8. 详情页状态应变为 `draft`，当前版本号增加。
-9. 点击 `发布当前草稿`。
-10. 状态应变为 `published`，该版本成为当前版本。
-11. 点击右上角时钟图标进入版本历史。
-12. 对非当前发布版本点击 `回滚到此版本`。
-13. 系统应生成一个新的已发布版本，历史版本不被覆盖。
+7. 在“基础信息”里修改模板名称、描述、场景、风格标签、妆效标签或预计分钟数。
+8. 在“五步结构”里确认每步可编辑步骤名称、MMU 标准步骤码、操作区域、完成标准、失败反馈、操作说明、AI 检测区域和单步难度分。
+9. 在“产品槽位”里确认可编辑槽位编码、类目、子类、必需等级、期望质地、期望妆效、可接受子类、替代槽位和 fallback 操作建议。
+10. 在“难度”里修改基础难度分，并按需要切换特殊技法标记。
+11. 点击 `保存草稿`。
+12. 保存前前端会做本地校验：
+   - 至少需要一个步骤。
+   - 每个步骤都需要绑定 MMU 标准步骤码。
+   - 每个产品槽位都需要槽位编码和类目。
+   - 产品槽位会在保存 payload 中绑定到有效步骤，避免后端因 stepBlockId 不匹配返回 400。
+13. 如果校验失败，页面显示错误信息且不会调用后端；校验通过后应显示保存成功反馈。
+14. 详情页状态应变为 `draft`，当前版本号增加。
+15. 点击 `发布当前草稿`。
+16. 状态应变为 `published`，该版本成为当前版本。
+17. 点击右上角时钟图标进入版本历史。
+18. 对非当前发布版本点击 `回滚到此版本`。
+19. 系统应生成一个新的已发布版本，历史版本不被覆盖。
 
 **后端旁证**
 
@@ -105,6 +117,20 @@ curl -fsS \
 - `items.length` 至少为 8。
 - 每个已发布模板都有 `currentVersion`。
 - `currentVersion.stepBlocks` 和 `currentVersion.productSlots` 非空。
+
+**平台健康旁证**
+
+```bash
+curl -fsS http://127.0.0.1:13001/platform/health | python -m json.tool
+```
+
+预期重点：
+
+- `database = ok`
+- `models.templateEmbedding.configured = true`
+- `models.templateReranker.configured = true`
+- `models.referenceVlm` 在上传参考图链路中可用，或清楚显示未配置原因
+- `models.asr`、`models.coach`、`models.comfyui` 给出健康状态和错误信息
 
 ### 用户旅程：生成一套面试轻熟知性妆
 
@@ -127,6 +153,8 @@ curl -fsS \
 
 7. 点击“开始生成”，等待 loading 页跳转到推荐结果页。
 
+可选：在“参考妆容图片”上传一张妆容参考图。上传后后端会调用 VLM 解析结构化妆效特征，结果页的 Model Evidence 会显示 `vlm = configured` 和参考图风格信号。
+
 **推荐结果页应该看到什么**
 
 - 页面进入“推荐方案”，不是空白页或失败页。
@@ -138,6 +166,13 @@ curl -fsS \
   - 匹配强度：来自 `matchScore`。
   - 缺失产品：展示缺失槽位类型；如果关键槽位全覆盖，则显示已覆盖。
 - “步骤概览”展示 5 步正式执行步骤：底妆、眉毛、眼妆、腮红/轮廓、唇妆/定妆。
+- “Model Evidence”卡片展示：
+  - `Trace mtrace_...`
+  - `Embedding configured`
+  - `Rerank configured`
+  - 未上传参考图时 `VLM skipped`，上传参考图时 `VLM configured`
+  - 语义分、重排分、产品覆盖分、难度等级。
+- 每个步骤下方展示 `MMU：...` 标准步骤码。
 
 **产品清单页应该看到什么**
 
@@ -161,6 +196,8 @@ curl -fsS \
    - “待补齐”：当前资产缺产品，并显示 fallback 操作建议。
 6. 底部点击“确认使用这些产品”返回推荐结果页。
 
+每个步骤标题下方应显示 `MMU：...`，证明 5 步演示流程仍映射到 MMU 14 步标准结构。
+
 **普通执行页应该看到什么**
 
 1. 在推荐结果页点击“普通执行”。
@@ -176,7 +213,45 @@ curl -fsS \
 
 1. 在推荐结果页点击“AI 化妆师实时指导”。
 2. Web 端会进入教练页，移动端会尝试进入实时摄像头跟妆页。
-3. 这条路径用于验证实时教练入口和当前模板步骤是否能接上；模板匹配本身的可见验证以前三页为准。
+3. Web 端如没有摄像头权限，使用“上传画面”选择当前步骤测试图。
+4. 上传后点击图片评估，页面应显示：
+   - `traceId`，格式为 `coach_...`
+   - `completionLevel`
+   - `canAutoAdvance`
+   - `mistakeTypes`
+   - `voiceText`
+5. 如果当前步骤已完成且 `canAutoAdvance = true`，前端才能进入下一步；如果模型判断未完成，应停留在当前步骤并播报纠正建议。
+
+**妆容预览怎么测**
+
+1. 在推荐结果页点击“妆容预览”。
+2. 上传自拍或 eval 正脸图。
+3. 选择妆前/妆后左右分屏或滑动对比。
+4. 发起预览后页面应显示：
+   - `jobId`，格式为 `preview_...`
+   - `traceId`
+   - `generatedTemplateId`
+   - `sourceStandardTemplateVersionId`
+   - `comparisonMode`
+5. 这一步证明预览 job 已绑定当前生成模板，而不是脱离模板的随机试妆。
+
+**生成模板历史怎么测**
+
+1. 生成至少一套推荐。
+2. 进入推荐历史或重新打开推荐页。
+3. 页面应能从后端生成结果库读取历史生成模板，而不是只依赖本地状态。
+
+后端旁证：
+
+```bash
+curl -fsS \
+  -H 'Authorization: Bearer demo-token' \
+  'http://127.0.0.1:13001/makeup-templates/generated?userId=user-001&limit=5' \
+  | python -m json.tool
+```
+
+预期 `items[0]` 包含 `sourceStandardTemplateId`、`matchScore`、`steps`、
+`productSlots` 和 `matchTrace`。
 
 ### 换输入验证其他模板族
 
@@ -207,11 +282,35 @@ curl -fsS \
 
 ```json
 {
+  "templateTraceId": "mtrace_...",
   "selectedTemplateId": "std_elegant_luxury",
   "selectedTemplateVersionId": "std_elegant_luxury_v1",
-  "selectedFamily": "ELEGANT_LUXURY"
+  "selectedFamily": "ELEGANT_LUXURY",
+  "modelStatus": {
+    "embedding": "configured",
+    "reranker": "configured",
+    "vlm": "skipped"
+  },
+  "scoreBreakdown": {
+    "embeddingSimilarity": 0.5,
+    "rerankerRelevance": 0.9
+  }
 }
 ```
+
+如果 embedding 或 reranker 服务没启动，接口应返回 `TEMPLATE_EMBEDDING_UNAVAILABLE` 或 `TEMPLATE_RERANKER_UNAVAILABLE`。这是预期行为，说明系统没有走低质量 mock/rule fallback。
+
+参考图路径旁证：
+
+```bash
+curl -fsS \
+  -H 'Authorization: Bearer demo-token' \
+  -H 'Content-Type: application/json' \
+  -d '{"rawUserInput":"参考图同款清透通勤妆","referenceImageDataUrl":"data:image/png;base64,AAAA"}' \
+  http://127.0.0.1:13001/makeup-template-library/match-debug | python -m json.tool
+```
+
+预期 `modelStatus.vlm = configured`，并返回 `referenceImageFeatures.styleSignals`。
 
 全角/混合大小写输入也应正常归一化，例如：
 
@@ -229,7 +328,9 @@ curl -fsS \
 
 - 用户能从“生成今日妆容”输入自然语言需求并生成推荐。
 - 推荐结果页可见命中模板、标准模板 ID、覆盖率、匹配强度和缺失产品。
+- 推荐结果页可见 `templateTraceId`、模型状态、分数拆解、难度拆解、MMU 标准步骤码。
 - 产品清单页可见 5 步，以及每步 `productSlots` 的已匹配/可替代/待补齐状态。
+- 产品清单页可见每步 `standardStepCodes`。
 - 执行页可见完成标准、错误反馈、AI 检测区域和视觉变化。
 - 面试轻熟妆命中 `ELEGANT_LUXURY`，不是通勤妆。
 - Y2K/女团/辣妹输入命中 `SPECIFIC_VISUAL`，并能识别全角混合大小写 `Ｙ２k`。
@@ -462,7 +563,28 @@ curl -fsS \
 - `steps[].productSlots`：每步产品槽位。
 - `steps[].completionCriteria` / `steps[].failureFeedback` / `steps[].aiDetectionArea`：执行页使用的判定标准。
 
-## 10. 模型服务说明
+## 10. 平台 smoke：一次跑通全链路
+
+```bash
+cd /storage/nvme3/shushanfu/MIMU-colleague
+MIMU_MODEL_MODE=mock bash scripts/start-mimu-platform-services.sh
+MIMU_BACKEND_URL=http://127.0.0.1:13001 bash scripts/smoke-mimu-platform.sh
+```
+
+这个脚本会验证：
+
+- `GET /health`
+- `GET /platform/health`
+- `POST /makeup-template-library/seed`
+- `POST /recommendations/generate`
+- `POST /makeup/jobs` 创建预览任务并写入模板元数据
+- `POST /makeup/coach/step-evaluate` 返回自动下一步 schema
+- `eval/template_matching/run_template_matching_eval.py` 全部 case
+
+报告输出在 `/tmp/mimu-*.json`。如果失败，先看失败步骤对应的 JSON，
+再查后端日志中的 `templateTraceId`、`preview_`、`coach_` 或 `voice_`。
+
+## 11. 模型服务说明
 
 当前算法支持可选模型增强：
 
@@ -472,31 +594,42 @@ curl -fsS \
 - `TEMPLATE_RERANKER_MODEL`
 - `TEMPLATE_MODEL_TIMEOUT_MS`
 
-如果这些环境变量没配置，接口仍然可用，会返回：
+正式匹配链路要求 embedding 和 reranker 服务可用。未配置或服务异常时，
+推荐和匹配接口应明确报错，例如 `TEMPLATE_EMBEDDING_UNAVAILABLE` 或
+`TEMPLATE_RERANKER_UNAVAILABLE`，不能静默退回低质量规则匹配。
+
+平台健康接口会展示模型状态：
 
 ```json
 {
-  "modelStatus": {
-    "embedding": "unavailable",
-    "reranker": "unavailable",
-    "vlm": "skipped"
+  "models": {
+    "templateEmbedding": {
+      "configured": true,
+      "healthy": true
+    },
+    "templateReranker": {
+      "configured": true,
+      "healthy": true
+    }
   },
-  "degraded": true
+  "backend": "ok"
 }
 ```
 
-这不是失败，而是本地降级打分生效。路演和 smoke 测试可以不依赖 GPU 模型。
+本地开发可以用 `scripts/start-template-model-mock-services.mjs` 或
+`scripts/start-mimu-platform-services.sh` 启动 mock 模型服务；路演和验收环境
+必须接真实 embedding/rerank 服务。
 
-## 11. 常见问题
+## 12. 常见问题
 
-### 11.1 前端入口在哪里？
+### 12.1 前端入口在哪里？
 
 现在有两个入口：
 
 - 模板库平台入口：`个人档案 -> 模板库管理`。
 - 用户推荐验证入口：`生成今日妆容`，生成后在推荐结果页、产品清单页和普通执行页查看新增字段。
 
-### 11.2 如何证明不是旧逻辑？
+### 12.2 如何证明不是旧逻辑？
 
 用这两个 case：
 
@@ -505,11 +638,12 @@ curl -fsS \
 
 这两个是这次修复前会出问题的典型 case。
 
-### 11.3 为什么 score 不高？
+### 12.3 为什么 score 不高？
 
-当前未接 embedding/reranker 时是降级打分，分数用于排序，不是百分制质量分。只要 `selectedTemplateId` 和 `selectedFamily` 符合预期，就说明匹配链路正确。
+分数用于排序，不是百分制质量分。正式链路重点看 embedding/rerank 服务健康、
+`selectedTemplateId`、`selectedFamily`、`matchScore` 和 trace 证据是否一致。
 
-### 11.4 可以让前端同学怎么测？
+### 12.4 可以让前端同学怎么测？
 
 前端同学可以先直接调：
 

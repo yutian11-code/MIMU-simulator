@@ -8,6 +8,8 @@
 data/
 var/
 eval/makeup/runs/
+eval/template_matching/report*.json
+eval/template_matching/*.report.json
 var/certs/
 __pycache__/
 *.py[cod]
