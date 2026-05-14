@@ -23,7 +23,7 @@ echo "[4/7] Generate recommendation"
 curl -fsS -X POST "$BACKEND_URL/recommendations/generate" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"userId":"user-001","scenario":"面试","scenarioDetails":"面试需要轻熟知性优雅妆，不要太浓","requirements":["不要太浓"]}' \
+  -d '{"scenario":"面试","scenarioDetails":"面试需要轻熟知性优雅妆，不要太浓","requirements":["不要太浓"]}' \
   | python -m json.tool >/tmp/mimu-generation.json
 
 echo "[5/7] Create makeup preview job"

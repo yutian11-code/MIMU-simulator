@@ -36,6 +36,72 @@ EXPO_PUBLIC_API_BASE_URL=http://10.246.1.70:13001
 COMFY_UI_BASE_URL=http://127.0.0.1:8188
 ```
 
+## 上线后 P0/P1 操作
+
+运营、产品和演示同学优先使用 HTTPS 路演入口：
+
+```text
+https://10.246.1.70:19443
+```
+
+每日开场前先跑一键健康检查：
+
+```bash
+cd /storage/nvme3/shushanfu/MIMU-colleague
+scripts/check-demo-health.sh
+```
+
+需要同时覆盖推荐、模板、预览和教练 smoke 时：
+
+```bash
+scripts/check-demo-health.sh --with-smoke
+```
+
+只重启应用层服务，不动 ASR、VLM、ComfyUI：
+
+```bash
+scripts/restart-demo-services.sh --dry-run
+scripts/restart-demo-services.sh
+```
+
+`--include-models` 只能在明确的模型维护窗口使用。默认重启脚本只处理
+`mimu-backend-13000`、`mimu-backend-13001`、`mimu-frontend-19006` 和
+`mimu-https-gateway-19443`，避免影响其他同学共用的模型服务。
+
+实时跟妆回归：
+
+```bash
+python eval/coach/scripts/run_realtime_coach_regression.py \
+  --backend-url http://127.0.0.1:13001 \
+  --image-limit 4 \
+  --video-limit 2 \
+  --output /tmp/mimu-coach-regression.json
+```
+
+脚本会用 `eval/data/评测集` 的图片、`data/` 下的用户实测视频抽帧、
+`eval/coach/assets/audio` 的语音样本和 WebSocket wake 握手覆盖链路。
+
+常见故障第一反应：
+
+- 页面空白：先跑 `scripts/check-demo-health.sh`，再看
+  `var/logs/frontend-19006.log` 和浏览器控制台。
+- 摄像头或麦克风打不开：优先走 `https://10.246.1.70:19443`，并检查证书信任、
+  浏览器站点权限和设备占用；HTTP 局域网地址通常不能申请摄像头权限。
+- ASR 没有转写：检查 `http://127.0.0.1:8020/health` 和
+  `var/logs/asr-8020.log`；回归脚本会跳过低 RMS 的无语音样本。
+- VLM token 或模型长度错误：检查 `COACH_LLM_MODEL`、`COACH_LLM_BASE_URL`、
+  vLLM `--max-model-len` 和后端日志中的 `coach_step_evaluate`。
+- WebSocket 连不上：检查 `/makeup/coach/realtime/wake`、HTTPS 网关 upgrade 和
+  `realtime_event` 日志。
+- AI 说完成但用户没确认：当前产品逻辑要求用户语音或按钮确认后才推进，
+  前端会显示 `AI 已确认，等待用户确认`；唤醒模式提示
+  `唤醒后再说：我完成了，下一步 / 帮我看一下`。
+
+模板库运营按 P1/P2/P3 分层处理：P1 可直接展示和匹配，P2 可进入人工校验池，
+P3 只保留来源音视频、抽帧和结构化草稿，不进入前台展示。所有模板必须保留
+source media、步骤、产品位、适配人群、质量标签和人工校验状态，方便后续回滚、
+复核和扩展。
+
 ## 验证命令
 
 后端：
