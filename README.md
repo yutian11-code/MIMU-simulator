@@ -64,6 +64,23 @@ Core local services:
 
 See `docs/team-runbook.md` for full startup and verification commands.
 
+## Public Video Template Library
+
+The formal template library now supports machine-published templates generated
+from public tutorial videos. The default seed manifest lives at:
+
+```text
+backend/data/public-video-template-library/public-video-seeds.json
+```
+
+Run the ingestion smoke from the repo root:
+
+```bash
+bash scripts/run-public-video-template-library.sh --limit 2 --max-publish-count 2
+```
+
+Detailed operator steps are in `docs/public-video-template-library-runbook.md`.
+
 ## Model And Data Policy
 
 Do not commit model weights, generated outputs, real user uploads, downloaded
