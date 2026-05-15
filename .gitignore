@@ -8,6 +8,8 @@
 data/
 var/
 eval/makeup/runs/
+eval/template_matching/report*.json
+eval/template_matching/*.report.json
 var/certs/
 __pycache__/
 *.py[cod]
@@ -30,6 +32,9 @@ __pycache__/
 /simulator-*.png
 /simulator-*.xml
 /window*.xml
+test-results/
+docs/MMU模板库标准构建(1).docx
+docs/妆容生成搭建模板.docx
 /*.aac
 /*.flac
 /*.m4a

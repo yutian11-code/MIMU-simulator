@@ -36,6 +36,72 @@ EXPO_PUBLIC_API_BASE_URL=http://10.246.1.70:13001
 COMFY_UI_BASE_URL=http://127.0.0.1:8188
 ```
 
+## 上线后 P0/P1 操作
+
+运营、产品和演示同学优先使用 HTTPS 路演入口：
+
+```text
+https://10.246.1.70:19443
+```
+
+每日开场前先跑一键健康检查：
+
+```bash
+cd /storage/nvme3/shushanfu/MIMU-colleague
+scripts/check-demo-health.sh
+```
+
+需要同时覆盖推荐、模板、预览和教练 smoke 时：
+
+```bash
+scripts/check-demo-health.sh --with-smoke
+```
+
+只重启应用层服务，不动 ASR、VLM、ComfyUI：
+
+```bash
+scripts/restart-demo-services.sh --dry-run
+scripts/restart-demo-services.sh
+```
+
+`--include-models` 只能在明确的模型维护窗口使用。默认重启脚本只处理
+`mimu-backend-13000`、`mimu-backend-13001`、`mimu-frontend-19006` 和
+`mimu-https-gateway-19443`，避免影响其他同学共用的模型服务。
+
+实时跟妆回归：
+
+```bash
+python eval/coach/scripts/run_realtime_coach_regression.py \
+  --backend-url http://127.0.0.1:13001 \
+  --image-limit 4 \
+  --video-limit 2 \
+  --output /tmp/mimu-coach-regression.json
+```
+
+脚本会用 `eval/data/评测集` 的图片、`data/` 下的用户实测视频抽帧、
+`eval/coach/assets/audio` 的语音样本和 WebSocket wake 握手覆盖链路。
+
+常见故障第一反应：
+
+- 页面空白：先跑 `scripts/check-demo-health.sh`，再看
+  `var/logs/frontend-19006.log` 和浏览器控制台。
+- 摄像头或麦克风打不开：优先走 `https://10.246.1.70:19443`，并检查证书信任、
+  浏览器站点权限和设备占用；HTTP 局域网地址通常不能申请摄像头权限。
+- ASR 没有转写：检查 `http://127.0.0.1:8020/health` 和
+  `var/logs/asr-8020.log`；回归脚本会跳过低 RMS 的无语音样本。
+- VLM token 或模型长度错误：检查 `COACH_LLM_MODEL`、`COACH_LLM_BASE_URL`、
+  vLLM `--max-model-len` 和后端日志中的 `coach_step_evaluate`。
+- WebSocket 连不上：检查 `/makeup/coach/realtime/wake`、HTTPS 网关 upgrade 和
+  `realtime_event` 日志。
+- AI 说完成但用户没确认：当前产品逻辑要求用户语音或按钮确认后才推进，
+  前端会显示 `AI 已确认，等待用户确认`；唤醒模式提示
+  `唤醒后再说：我完成了，下一步 / 帮我看一下`。
+
+模板库运营按 P1/P2/P3 分层处理：P1 可直接展示和匹配，P2 可进入人工校验池，
+P3 只保留来源音视频、抽帧和结构化草稿，不进入前台展示。所有模板必须保留
+source media、步骤、产品位、适配人群、质量标签和人工校验状态，方便后续回滚、
+复核和扩展。
+
 ## 验证命令
 
 后端：
@@ -74,10 +140,166 @@ tmux new-session -d -s mimu_https_gateway \
 
 ## MMU 模板库智能匹配
 
-模板匹配链路默认不独占 GPU。在线优先使用标准模板库，
-先走缓存、索引和规则匹配。只有配置了
-`TEMPLATE_EMBEDDING_BASE_URL` 或 `TEMPLATE_RERANKER_BASE_URL` 时，
-才会调用可选的 embedding / reranker 模型服务。
+模板匹配链路默认不独占 GPU。在线优先读取 PostgreSQL 中
+`published` 的标准模板当前版本；数据库未 seed 时会回退到本地静态模板，
+保证开发环境可用。正式生成路径要求 embedding 和 reranker 服务可用；
+这两个服务不可用时会返回明确错误，不再静默降级为低质量规则匹配。
+
+本地 smoke 可先启动 OpenAI-compatible mock 服务：
+
+```bash
+cd /storage/nvme3/shushanfu/MIMU-colleague
+node scripts/start-template-model-mock-services.mjs
+```
+
+然后设置后端环境：
+
+```env
+TEMPLATE_EMBEDDING_BASE_URL=http://127.0.0.1:8030
+TEMPLATE_EMBEDDING_MODEL=Qwen3-Embedding-4B
+TEMPLATE_RERANKER_BASE_URL=http://127.0.0.1:8031
+TEMPLATE_RERANKER_MODEL=Qwen3-Reranker-8B
+TEMPLATE_VLM_BASE_URL=http://127.0.0.1:8032
+TEMPLATE_VLM_MODEL=Qwen2.5-VL-32B-Instruct-AWQ
+TEMPLATE_MODEL_TIMEOUT_MS=5000
+```
+
+生产/路演环境必须把这些变量指向真实 Qwen embedding、reranker 和 VLM
+服务。排查时搜索响应里的 `templateTraceId`，后端结构化日志会带同一个 ID。
+
+模板匹配评测可在后端启动后运行。`match-debug` 适合快速定位模板命中，
+`recommendation` 会走完整推荐生成入口：
+
+```bash
+python eval/template_matching/run_template_matching_eval.py \
+  --backend-url http://127.0.0.1:13001 \
+  --mode match-debug \
+  --output eval/template_matching/report.local.json
+python eval/template_matching/run_template_matching_eval.py \
+  --backend-url http://127.0.0.1:13001 \
+  --mode recommendation \
+  --output /tmp/mimu-template-recommendation.report.json
+```
+
+不要提交 `eval/template_matching/report*.json` 或
+`eval/template_matching/*.report.json` 这类本地评测报告；这些路径已在顶层
+`.gitignore` 忽略，也可直接输出到 `/tmp`。`recommendation` 模式是端到端
+推荐 smoke：case 中的 `profile` 和 `ownedProducts` 只作为文本
+requirements 信号发送，不会替换后端数据库里的用户资料或资产 fixture。
+该模式会在响应包含 `steps[].standardStepCodes` 时检查
+`requiredStepCodes`；`match-debug` 等不返回 step code 的响应会把检查标为
+`skipped`。
+
+### Platform Smoke
+
+启动模板匹配 mock 模型服务并跑平台 smoke：
+
+```bash
+cd /storage/nvme3/shushanfu/MIMU-colleague
+MIMU_MODEL_MODE=mock bash scripts/start-mimu-platform-services.sh
+MIMU_BACKEND_URL=http://127.0.0.1:13001 bash scripts/smoke-mimu-platform.sh
+```
+
+`scripts/start-mimu-platform-services.sh` 在 mock 模式下会启动
+embedding、rerank 和参考图 VLM mock 服务，端口为 `8030/8031/8032`，
+日志写入 `var/logs/template-model-mocks.log`。真实模型模式下不要使用
+mock，需按本 runbook 配置真实 embedding、rerank、VLM、ASR、ComfyUI 和
+coach 服务。
+
+平台健康检查：
+
+```bash
+curl -fsS http://127.0.0.1:13001/platform/health | python -m json.tool
+```
+
+重点看：
+
+- `models.templateEmbedding`
+- `models.templateReranker`
+- `models.referenceVlm`
+- `models.asr`
+- `models.coach`
+- `models.comfyui`
+
+排查日志时优先搜索：
+
+- `templateTraceId`：模板匹配和推荐生成。
+- `preview_`：妆容预览任务。
+- `coach_`：图片/实时跟妆步骤评估。
+- `voice_`：语音转写和语音教练。
+
+smoke 脚本会依次验证后端健康、平台健康、模板库 seed、推荐生成、预览
+job 创建、静态图片 step-evaluate schema、模板匹配评测，并把 JSON 结果写到
+`/tmp/mimu-*.json`。
+
+### 模板库初始化与管理
+
+首次部署或数据库迁移后，先执行迁移：
+
+```bash
+cd /storage/nvme3/shushanfu/MIMU-colleague/backend
+npx prisma migrate deploy
+```
+
+然后 seed 产品文档中的标准模板库：
+
+```bash
+curl -fsS -X POST http://127.0.0.1:13001/makeup-template-library/seed \
+  -H 'Authorization: Bearer demo-token' \
+  -H 'Content-Type: application/json' \
+  -d '{}' | python -m json.tool
+```
+
+预期返回 8 个 style/template 计数，以及产品分类、操作区域、脸型和难度规则计数。
+
+管理 API：
+
+```text
+GET  /makeup-template-library/taxonomy
+GET  /makeup-template-library/templates
+GET  /makeup-template-library/templates/:templateId
+GET  /makeup-template-library/templates/:templateId/versions
+GET  /makeup-template-library/templates/:templateId/versions/:versionId
+POST /makeup-template-library/templates
+PUT  /makeup-template-library/templates/:templateId/draft
+POST /makeup-template-library/templates/:templateId/publish
+POST /makeup-template-library/templates/:templateId/archive
+POST /makeup-template-library/templates/:templateId/rollback
+POST /makeup-template-library/seed
+```
+
+前端入口：
+
+```text
+个人档案 -> 模板库管理
+```
+
+前端可完成：
+
+- 导入标准模板。
+- 按状态搜索模板。
+- 编辑当前版本生成草稿。
+- 发布草稿为当前正式版本。
+- 查看版本历史并回滚，回滚会复制历史版本生成新的已发布版本。
+
+推荐链路验证：
+
+```bash
+curl -fsS -X POST http://127.0.0.1:13001/recommendations/generate \
+  -H 'Authorization: Bearer demo-token' \
+  -H 'Content-Type: application/json' \
+  -d '{"userId":"user-001","scenario":"面试","scenarioDetails":"面试需要轻熟知性优雅妆，不要太浓","requirements":["不要太浓"]}' \
+  | python -m json.tool
+```
+
+响应应包含：
+
+- `generatedTemplateId`
+- `sourceStandardTemplateId`
+- `sourceStandardTemplateVersionId`
+- `templateFamily`
+- `matchScore`
+- `steps[].productSlots`
 
 资源预算：
 
@@ -85,14 +307,16 @@ tmux new-session -d -s mimu_https_gateway \
 - GPU 4-7：48G 4090，保留给 VLM、妆容预览和实时教练。
 - 该路径不新增常驻 72B 服务。
 
-后端可选环境变量：
+后端必需环境变量：
 
 ```env
-TEMPLATE_EMBEDDING_BASE_URL=
-TEMPLATE_EMBEDDING_MODEL=
-TEMPLATE_RERANKER_BASE_URL=
-TEMPLATE_RERANKER_MODEL=
-TEMPLATE_MODEL_TIMEOUT_MS=30000
+TEMPLATE_EMBEDDING_BASE_URL=http://127.0.0.1:8030/v1
+TEMPLATE_EMBEDDING_MODEL=Qwen3-Embedding-4B
+TEMPLATE_RERANKER_BASE_URL=http://127.0.0.1:8031/v1
+TEMPLATE_RERANKER_MODEL=Qwen3-Reranker-8B
+TEMPLATE_VLM_BASE_URL=http://127.0.0.1:8010/v1
+TEMPLATE_VLM_MODEL=Qwen2.5-VL-32B-Instruct-AWQ
+TEMPLATE_MODEL_TIMEOUT_MS=5000
 ```
 
 模型下载优先使用 hf-mirror：
